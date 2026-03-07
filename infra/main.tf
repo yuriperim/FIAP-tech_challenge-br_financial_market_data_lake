@@ -17,7 +17,7 @@ variable "project_name" {
 # S3
 
 resource "aws_s3_bucket" "fiap_datalake" {
-  bucket = "${var.origin}-${var.project_name}"
+  bucket = "fiap-tech-challenge-br-financial-market-data-lake"
 
   tags = {
     Origin  = var.origin
