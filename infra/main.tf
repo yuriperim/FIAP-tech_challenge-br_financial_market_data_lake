@@ -96,6 +96,7 @@ resource "aws_iam_policy" "glue_s3_access" {
       {
         Effect = "Allow"
         Action = [
+          "s3:GetBucketLocation",
           "s3:ListBucket"
         ]
         Resource = aws_s3_bucket.fiap_datalake.arn
