@@ -2,7 +2,15 @@ provider "aws" {
   region = "us-east-1"
 }
 
-variable "origin" {
+# Variáveis
+
+variable "infra_origin" {
+  description = "Origem da infraestrutura"
+  type        = string
+  default     = "terraform"
+}
+
+variable "project_origin" {
   description = "Origem do projeto"
   type        = string
   default     = "fiap-tech_challenge"
@@ -20,13 +28,14 @@ resource "aws_s3_bucket" "fiap_datalake" {
   bucket = "fiap-tech-challenge-br-financial-market-data-lake"
 
   tags = {
-    Origin  = var.origin
-    Project = var.project_name
+    infra_origin   = var.infra_origin
+    project_origin = var.project_origin
+    project_name   = var.project_name
   }
 }
 
 resource "aws_s3_bucket_public_access_block" "bucket_security" {
-  bucket = aws_s3_bucket.fiap_datalake.id
+  bucket = aws_s3_bucket.fiap_datalake.bucket
 
   block_public_acls       = true
   block_public_policy     = true
