@@ -183,7 +183,8 @@ resource "aws_glue_job" "extract_job" {
     {
       "--spark-event-logs-path"     = "s3://${aws_s3_bucket.fiap_datalake.bucket}/glue/extract/spark-ui/"
       "--TempDir"                   = "s3://${aws_s3_bucket.fiap_datalake.bucket}/glue/extract/temp/"
-      "--additional-python-modules" = "yfinance==0.2.66"
+      "--additional-python-modules" = "yfinance==0.2.66,pandas==2.2.2"
+      "--bucket_name"               = aws_s3_bucket.fiap_datalake.bucket
     }
   )
 
@@ -191,7 +192,7 @@ resource "aws_glue_job" "extract_job" {
   worker_type       = "G.1X"
   number_of_workers = 2
   max_retries       = 0
-  timeout           = 10 # tempo máximo de execução em minutos
+  timeout           = 30 # tempo máximo de execução em minutos
 
   execution_property {
     max_concurrent_runs = 1 # previne execução concorrente (ex.: agendamento + execução manual console)
