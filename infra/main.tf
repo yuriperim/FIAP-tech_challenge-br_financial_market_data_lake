@@ -41,6 +41,8 @@ variable "glue_default_arguments" {
 resource "aws_s3_bucket" "fiap_datalake" {
   bucket = "fiap-tech-challenge-br-financial-market-data-lake"
 
+  force_destroy = true # permite destruir bucket não vazio
+
   tags = {
     infra_origin   = var.infra_origin
     project_origin = var.project_origin
@@ -183,7 +185,7 @@ resource "aws_glue_job" "extract_job" {
     {
       "--spark-event-logs-path"     = "s3://${aws_s3_bucket.fiap_datalake.bucket}/glue/extract/spark-ui/"
       "--TempDir"                   = "s3://${aws_s3_bucket.fiap_datalake.bucket}/glue/extract/temp/"
-      "--additional-python-modules" = "yfinance==0.2.66,pandas==2.2.2"
+      "--additional-python-modules" = "yfinance==0.2.66"
       "--bucket_name"               = aws_s3_bucket.fiap_datalake.bucket
     }
   )
