@@ -42,10 +42,10 @@ def get_tickers_data(tickers_list):
 
     # Campos
     cols = [
+        "datatrade",
         "ticker",
         "longName",
         "sector",
-        "datatrade",
         "Open",
         "High",
         "Low",
@@ -110,10 +110,10 @@ stocks_path = f"s3://{bucket_name}/raw/stocks/"
 
 # -> Sobrescreve partições presentes, preservando as demais
 spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")  # default: static
-# -> Particiona por datatrade, evitando duplicidade
+# -> Particiona por dataproc, evitando duplicidade
 (tickers_sdf.write
             .mode("overwrite")
-            .partitionBy("datatrade")
+            .partitionBy("dataproc")
             .option("compression", "snappy")  # opção default, declarada para mostrar intenção
             .parquet(stocks_path))
 
@@ -126,6 +126,7 @@ tb_input = {
     "Name": tb_name,
     "StorageDescriptor": {
         "Columns": [
+            {"Name": "datatrade", "Type": "int"},
             {"Name": "ticker", "Type": "string"},
             {"Name": "longName", "Type": "string"},
             {"Name": "sector", "Type": "string"},
@@ -135,7 +136,6 @@ tb_input = {
             {"Name": "Close", "Type": "double"},
             {"Name": "Volume", "Type": "bigint"},
             {"Name": "isRepaired", "Type": "boolean"},
-            {"Name": "dataproc", "Type": "int"},
         ],
         "Location": tb_loc,
         "InputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
@@ -145,7 +145,7 @@ tb_input = {
         },
     },
     "PartitionKeys": [
-        {"Name": "datatrade", "Type": "int"}
+        {"Name": "dataproc", "Type": "int"}
     ],
     "TableType": "EXTERNAL_TABLE",
 }
