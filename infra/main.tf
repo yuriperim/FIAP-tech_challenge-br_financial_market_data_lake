@@ -74,6 +74,20 @@ resource "aws_s3_object" "scripts_path" {
   key    = "glue/scripts/"
 }
 
+resource "aws_s3_object" "tickers_json" {
+  bucket = aws_s3_bucket.fiap_datalake.bucket
+  key    = "glue/scripts/tickers.json"
+  source = "../scripts/tickers.json"
+  etag   = filemd5("../scripts/tickers.json") # garante upload se o json for modificado
+}
+
+resource "aws_s3_object" "extract_script" {
+  bucket = aws_s3_bucket.fiap_datalake.bucket
+  key    = "glue/scripts/extract_job.py"
+  source = "../scripts/extract_job.py"
+  etag   = filemd5("../scripts/extract_job.py") # garante upload se o script for modificado
+}
+
 resource "aws_s3_object" "extract_logs_path" {
   bucket = aws_s3_bucket.fiap_datalake.bucket
   key    = "glue/extract/spark-ui/"
@@ -185,7 +199,7 @@ resource "aws_glue_job" "extract_job" {
     {
       "--spark-event-logs-path"     = "s3://${aws_s3_bucket.fiap_datalake.bucket}/glue/extract/spark-ui/"
       "--TempDir"                   = "s3://${aws_s3_bucket.fiap_datalake.bucket}/glue/extract/temp/"
-      "--additional-python-modules" = "yfinance==0.2.66"
+      "--additional-python-modules" = "urllib3==1.26.20,yfinance==0.2.66" # urllib3<2 especificada por compatibilidade com boto3
       "--bucket_name"               = aws_s3_bucket.fiap_datalake.bucket
     }
   )
@@ -204,5 +218,15 @@ resource "aws_glue_job" "extract_job" {
     infra_origin   = var.infra_origin
     project_origin = var.project_origin
     project_name   = var.project_name
+  }
+}
+
+resource "aws_glue_trigger" "extract_job_schedule" {
+  name     = "br-financial-market-extract-job-schedule"
+  type     = "SCHEDULED"
+  schedule = "cron(0 5 * * ? *)" # diariamente às 05:00 UTC+00:00 (02:00 UTC-03:00)
+
+  actions {
+    job_name = aws_glue_job.extract_job.name
   }
 }
