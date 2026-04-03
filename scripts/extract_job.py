@@ -7,22 +7,17 @@ import boto3
 from awsglue.transforms import *
 from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
-from pyspark.sql.functions import current_date, date_format
+from pyspark.sql import functions as F
 from awsglue.context import GlueContext
 from awsglue.job import Job
 
-import yfinance as yf
+from datetime import datetime, timezone
 import pandas as pd
+import yfinance as yf
 
 # Configuração do logger
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
 
 # @params: [JOB_NAME]
 args = getResolvedOptions(sys.argv, ["JOB_NAME", "bucket_name"])
@@ -83,8 +78,10 @@ s3_client = boto3.client("s3")
 glue_client = boto3.client("glue")
 
 # Tickers
+bucket_name = args["bucket_name"]
+
 tickers_obj = s3_client.get_object(
-    Bucket="fiap-tech-challenge-br-financial-market-data-lake",
+    Bucket=bucket_name,
     Key="glue/scripts/tickers.json"
 )
 tickers_json = json.load(tickers_obj["Body"])
@@ -96,8 +93,11 @@ tickers_dfs_2nd, _ = get_tickers_data(missing_tickers)
 tickers_df = pd.concat([*tickers_dfs_1st, *tickers_dfs_2nd], ignore_index=True)
 
 tickers_sdf = spark.createDataFrame(tickers_df)
+
 tickers_sdf = tickers_sdf.withColumnRenamed("Repaired?", "isRepaired")
-tickers_sdf = tickers_sdf.withColumn("dataproc", date_format(current_date(), "yyyyMMdd").cast("int"))
+
+dataproc = int(datetime.now(timezone.utc).strftime("%Y%m%d"))
+tickers_sdf = tickers_sdf.withColumn("dataproc", F.lit(dataproc))
 
 # Informações DataFrame
 logger.info("Schema do DataFrame")
@@ -105,7 +105,6 @@ tickers_sdf.printSchema()
 logger.info(f"Número de registros no DataFrame: {tickers_sdf.count()}")
 
 # Persistência dados
-bucket_name = args["bucket_name"]
 stocks_path = f"s3://{bucket_name}/raw/stocks/"
 
 # -> Sobrescreve partições presentes, preservando as demais
@@ -119,7 +118,7 @@ spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")  # default
 
 # Catalogação dados
 db_name = "br_financial_market"
-tb_name = "stocks"
+tb_name = "raw_stocks"
 tb_loc = stocks_path
 
 tb_input = {
@@ -168,5 +167,18 @@ else:
 logger.info("Descobrindo partições no Glue Catalog")
 repair_query = f"MSCK REPAIR TABLE {db_name}.{tb_name}"
 spark.sql(repair_query)
+
+# Finalização
+try:
+    logger.info("Criando arquivo _SUCCESS")
+    success_key = f"raw/stocks/dataproc={dataproc}/_SUCCESS"
+    s3_client.put_object(
+        Bucket=bucket_name,
+        Key=success_key,
+        Body=b""
+    )
+except Exception:
+    logger.error("Erro ao criar arquivo _SUCCESS")
+    raise
 
 job.commit()
