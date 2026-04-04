@@ -1,6 +1,7 @@
 import sys
 import random
 import time
+from datetime import datetime, timezone
 import json
 import logging
 import boto3
@@ -11,7 +12,6 @@ from pyspark.sql import functions as F
 from awsglue.context import GlueContext
 from awsglue.job import Job
 
-from datetime import datetime, timezone
 import pandas as pd
 import yfinance as yf
 
@@ -144,7 +144,7 @@ tb_input = {
         },
     },
     "PartitionKeys": [
-        {"Name": "dataproc", "Type": "int"}
+        {"Name": "dataproc", "Type": "int"},
     ],
     "TableType": "EXTERNAL_TABLE",
 }

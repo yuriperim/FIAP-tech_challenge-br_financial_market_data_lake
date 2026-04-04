@@ -338,6 +338,7 @@ resource "aws_glue_job" "transform_job" {
     {
       "--spark-event-logs-path" = "s3://${aws_s3_bucket.fiap_datalake.bucket}/glue/transform/spark-ui/"
       "--TempDir"               = "s3://${aws_s3_bucket.fiap_datalake.bucket}/glue/transform/temp/"
+      "--bucket_name"           = aws_s3_bucket.fiap_datalake.bucket
     }
   )
 
