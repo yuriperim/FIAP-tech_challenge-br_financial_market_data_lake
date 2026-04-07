@@ -33,28 +33,28 @@ raw_stocks_sdf = glueContext.create_dynamic_frame.from_catalog(
     table_name="raw_stocks"
 ).toDF()
 
-trusted_stocks_sdf = (raw_stocks_sdf.withColumnRenamed("longName", "name")
+refined_stocks_sdf = (raw_stocks_sdf.withColumnRenamed("longName", "name")
                                     .withColumnRenamed("Volume", "tradedVolume"))
 
 w_latest = (Window.partitionBy("datatrade", "ticker")
                   .orderBy(F.col("dataproc").desc()))
-trusted_stocks_sdf = (trusted_stocks_sdf.withColumn("rn", F.row_number().over(w_latest))
+refined_stocks_sdf = (refined_stocks_sdf.withColumn("rn", F.row_number().over(w_latest))
                                         .filter(F.col("rn") == 1)
                                         .drop("dataproc", "rn"))
 
 w_sector = Window.partitionBy("datatrade", "sector")
-trusted_stocks_sdf = trusted_stocks_sdf.withColumn("totalSectorTradedVolume", F.sum("tradedVolume").over(w_sector))
+refined_stocks_sdf = refined_stocks_sdf.withColumn("totalSectorTradedVolume", F.sum("tradedVolume").over(w_sector))
 
-trusted_stocks_sdf = trusted_stocks_sdf.withColumn(
+refined_stocks_sdf = refined_stocks_sdf.withColumn(
     "fracSectorTradedVolume",
     F.round(100.0 * F.col("tradedVolume") / F.col("totalSectorTradedVolume"), 2)
 )
 
 w_lag = (Window.partitionBy("ticker")
                .orderBy("datatrade"))
-trusted_stocks_sdf = trusted_stocks_sdf.withColumn("prevClose", F.lag("Close").over(w_lag))
+refined_stocks_sdf = refined_stocks_sdf.withColumn("prevClose", F.lag("Close").over(w_lag))
 
-trusted_stocks_sdf = trusted_stocks_sdf.withColumn(
+refined_stocks_sdf = refined_stocks_sdf.withColumn(
     "TR",  # True Range
     F.when(
         F.col("prevClose").isNull(),
@@ -72,24 +72,24 @@ trusted_stocks_sdf = trusted_stocks_sdf.withColumn(
 w_tr_sma = (Window.partitionBy("ticker")
                   .orderBy("datatrade")
                   .rowsBetween(-13, 0))  # janela de 14 dias, incluindo o dia atual
-trusted_stocks_sdf = trusted_stocks_sdf.withColumn("ATR", F.avg("TR").over(w_tr_sma))
+refined_stocks_sdf = refined_stocks_sdf.withColumn("ATR", F.avg("TR").over(w_tr_sma))
 
 dataproc = int(datetime.now(timezone.utc).strftime("%Y%m%d"))
-trusted_stocks_sdf = trusted_stocks_sdf.withColumn("dataproc", F.lit(dataproc))
+refined_stocks_sdf = refined_stocks_sdf.withColumn("dataproc", F.lit(dataproc))
 
 # Informações DataFrame
 logger.info("Schema do DataFrame")
-trusted_stocks_sdf.printSchema()
-logger.info(f"Número de registros no DataFrame: {trusted_stocks_sdf.count()}")
+refined_stocks_sdf.printSchema()
+logger.info(f"Número de registros no DataFrame: {refined_stocks_sdf.count()}")
 
 # Persistência dados
 bucket_name = args["bucket_name"]
-stocks_path = f"s3://{bucket_name}/trusted/stocks/"
+stocks_path = f"s3://{bucket_name}/refined/stocks/"
 
 # -> Sobrescreve partições presentes, preservando as demais
 spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")  # default: static
 # -> Particiona por datatrade e ticker, evitando duplicidade
-(trusted_stocks_sdf.write
+(refined_stocks_sdf.write
                    .mode("overwrite")
                    .partitionBy("datatrade", "ticker")
                    .option("compression", "snappy")  # opção default, declarada para mostrar intenção
@@ -97,7 +97,7 @@ spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")  # default
 
 # Catalogação dados
 db_name = "br_financial_market"
-tb_name = "trusted_stocks"
+tb_name = "refined_stocks"
 tb_loc = stocks_path
 
 tb_input = {
